@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  traefik:
+    image: traefik:v2.11
+    networks:
+      - traefik-public
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - --providers.docker
+      - --providers.docker.swarmMode=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+    ports:
+      - target: 80
+        published: 80
+        mode: host
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+networks:
+  traefik-public:
+    external: true

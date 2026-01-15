@@ -1,0 +1,42 @@
+services:
+
+  haproxy:
+    image: haproxy:2.9
+    container_name: lab-haproxy
+    networks:
+      labnet:
+        ipv4_address: 172.31.0.10
+    volumes:
+      - ./haproxy:/usr/local/etc/haproxy
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  swarm1:
+    image: docker:27-dind
+    container_name: lab-swarm1
+    privileged: true
+    networks:
+      labnet:
+        ipv4_address: 172.31.0.11
+    ports:
+      - "9000:9000"
+    command: dockerd-entrypoint.sh
+    restart: unless-stopped
+
+  swarm2:
+    image: docker:27-dind
+    container_name: lab-swarm2
+    privileged: true
+    networks:
+      labnet:
+        ipv4_address: 172.31.0.12
+    command: dockerd-entrypoint.sh
+    restart: unless-stopped
+
+networks:
+  labnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
