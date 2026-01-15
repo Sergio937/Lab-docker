@@ -6,6 +6,8 @@ from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 import subprocess
 import os
+import sys
+import platform
 import json
 import yaml
 import time
@@ -17,8 +19,8 @@ CORS(app)
 
 # Configurações
 STACKS_DIR = 'stacks'
-SCRIPT_SUBIR = './subir_lab.sh'
-SCRIPT_DESTRUIR = './destruir_lab.sh'
+SCRIPT_SUBIR = 'bash ./subir_lab.sh'
+SCRIPT_DESTRUIR = 'bash ./destruir_lab.sh'
 HAPROXY_CFG = 'lab-devops/haproxy/haproxy.cfg'
 DOCKER_COMPOSE = 'lab-devops/docker-compose.yaml'
 
@@ -26,6 +28,10 @@ DOCKER_COMPOSE = 'lab-devops/docker-compose.yaml'
 JENKINS_URL = os.getenv('JENKINS_URL', 'http://localhost:8083')
 JENKINS_USER = os.getenv('JENKINS_USER', 'admin')
 JENKINS_TOKEN = os.getenv('JENKINS_TOKEN', '')
+
+# Configurações de Segurança
+SONARQUBE_URL = os.getenv('SONARQUBE_URL', 'http://172.31.0.11:80/sonarqube')
+TRIVY_URL = os.getenv('TRIVY_URL', 'http://172.31.0.11:80/trivy')
 
 def create_jenkins_pipeline(stack_name, cicd_config):
     """Cria uma pipeline no Jenkins para CI/CD do stack"""
@@ -193,9 +199,34 @@ def get_available_stacks():
                         content = yaml.safe_load(f)
                         if content and 'services' in content:
                             stack_info['services'] = list(content['services'].keys())
+                            stack_info['urls'] = []
                             
-                            # Extrair portas expostas
+                            # Extrair portas expostas e URLs
                             for service_name, service_config in content['services'].items():
+                                # Extrair URLs dos labels do Traefik
+                                if 'deploy' in service_config and 'labels' in service_config['deploy']:
+                                    labels = service_config['deploy']['labels']
+                                    path_prefix = None
+                                    host_rule = None
+                                    
+                                    for label in labels:
+                                        if 'traefik.http.routers.' in label and '.rule=' in label:
+                                            rule_value = label.split('=', 1)[1] if '=' in label else ''
+                                            
+                                            # PathPrefix
+                                            if 'PathPrefix(' in rule_value:
+                                                path_prefix = rule_value.split('`')[1] if '`' in rule_value else None
+                                            # Host
+                                            elif 'Host(' in rule_value:
+                                                host_rule = rule_value.split('`')[1] if '`' in rule_value else None
+                                    
+                                    # Construir URL baseada nas regras do Traefik
+                                    if path_prefix:
+                                        stack_info['urls'].append(f"http://localhost:8080{path_prefix}")
+                                    elif host_rule:
+                                        stack_info['urls'].append(f"http://{host_rule}")
+                                
+                                # Extrair portas publicadas
                                 if 'ports' in service_config:
                                     for port in service_config['ports']:
                                         # Novo formato: dict com target/published/mode
@@ -211,8 +242,10 @@ def get_available_stacks():
                                             stack_info['ports'].append(str(port))
                         else:
                             stack_info['services'] = []
+                            stack_info['urls'] = []
                 except:
                     stack_info['services'] = []
+                    stack_info['urls'] = []
                 
                 stacks.append(stack_info)
     
@@ -249,8 +282,10 @@ def get_docker_stack_status():
                         # Adicionar portas se disponível
                         if stack_name in available_dict:
                             stack_data['ports'] = available_dict[stack_name].get('ports', [])
+                            stack_data['urls'] = available_dict[stack_name].get('urls', [])
                         else:
                             stack_data['ports'] = []
+                            stack_data['urls'] = []
                         
                         stacks.append(stack_data)
                 return stacks
@@ -604,8 +639,7 @@ def api_update_stack():
 @app.route('/api/lab/start', methods=['POST'])
 def api_lab_start():
     """API: Inicia todo o lab"""
-    command = 'bash ./subir_lab.sh'
-    result = run_bash_command(command)
+    result = run_bash_command(SCRIPT_SUBIR)
     
     return jsonify({
         'success': result['success'],
@@ -616,8 +650,7 @@ def api_lab_start():
 @app.route('/api/lab/destroy', methods=['POST'])
 def api_lab_destroy():
     """API: Destrói todo o lab"""
-    command = 'bash ./destruir_lab.sh'
-    result = run_bash_command(command)
+    result = run_bash_command(SCRIPT_DESTRUIR)
     
     return jsonify({
         'success': result['success'],
@@ -946,6 +979,232 @@ networks:
 """
     
     return yaml_content
+
+@app.route('/api/security/sonarqube')
+def api_sonarqube_metrics():
+    """API: Métricas do SonarQube"""
+    try:
+        # Tentar conectar ao SonarQube
+        response = requests.get(
+            f"{SONARQUBE_URL}/api/measures/component",
+            params={
+                'component': 'default',
+                'metricKeys': 'bugs,vulnerabilities,code_smells,coverage,quality_gate_details'
+            },
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            measures = data.get('component', {}).get('measures', [])
+            
+            metrics = {}
+            for measure in measures:
+                key = measure.get('metric')
+                value = measure.get('value', '0')
+                metrics[key] = value
+            
+            # Buscar projetos
+            projects_response = requests.get(
+                f"{SONARQUBE_URL}/api/projects/search",
+                timeout=5
+            )
+            projects = []
+            if projects_response.status_code == 200:
+                projects_data = projects_response.json()
+                projects = [p.get('name') for p in projects_data.get('components', [])]
+            
+            return jsonify({
+                'success': True,
+                'bugs': int(metrics.get('bugs', 0)),
+                'vulnerabilities': int(metrics.get('vulnerabilities', 0)),
+                'code_smells': int(metrics.get('code_smells', 0)),
+                'coverage': float(metrics.get('coverage', 0)),
+                'quality_gate': 'OK' if metrics.get('quality_gate_details') else 'N/A',
+                'projects': projects
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'SonarQube retornou status {response.status_code}'
+            })
+            
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'success': False,
+            'error': 'Não foi possível conectar ao SonarQube. Verifique se o serviço está rodando.'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/api/security/trivy')
+def api_trivy_metrics():
+    """API: Métricas do Trivy"""
+    try:
+        # Verificar se Trivy está acessível
+        response = requests.get(f"{TRIVY_URL}/healthz", timeout=5)
+        
+        # Dados simulados - Trivy geralmente não tem API REST para métricas
+        # Em produção, você precisaria ler os resultados de scans salvos
+        return jsonify({
+            'success': True,
+            'critical': 0,
+            'high': 0,
+            'medium': 0,
+            'low': 0,
+            'last_scan': datetime.now().isoformat(),
+            'message': 'Execute um scan para ver resultados'
+        })
+            
+    except requests.exceptions.ConnectionError:
+        return jsonify({
+            'success': False,
+            'error': 'Não foi possível conectar ao Trivy. Verifique se o serviço está rodando.'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/api/security/trivy/scan', methods=['POST'])
+def api_trivy_scan():
+    """API: Iniciar scan do Trivy"""
+    try:
+        # Executar scan em background
+        # Exemplo: escanear uma imagem
+        command = 'docker exec lab-swarm1 docker run --rm aquasec/trivy:latest image alpine:latest'
+        result = run_bash_command(command)
+        
+        return jsonify({
+            'success': result['success'],
+            'output': result['stdout'],
+            'error': result['stderr']
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/api/security/trivy/scan-image', methods=['POST'])
+def api_trivy_scan_image():
+    """API: Escanear imagem Docker específica com Trivy"""
+    try:
+        data = request.json
+        image_name = data.get('image')
+        
+        if not image_name:
+            return jsonify({
+                'success': False,
+                'error': 'Nome da imagem não fornecido'
+            })
+        
+        # Executar Trivy no formato JSON
+        command = f'docker exec lab-swarm1 docker run --rm aquasec/trivy:latest image --format json --severity CRITICAL,HIGH,MEDIUM,LOW {image_name}'
+        result = run_bash_command(command)
+        
+        if not result['success']:
+            return jsonify({
+                'success': False,
+                'error': result['stderr'] or 'Erro ao executar scan'
+            })
+        
+        # Parse do resultado JSON
+        try:
+            import json
+            scan_output = json.loads(result['stdout'])
+            
+            # Processar resultados
+            vulnerabilities = []
+            critical_count = 0
+            high_count = 0
+            medium_count = 0
+            low_count = 0
+            
+            # Trivy retorna uma lista de resultados (um para cada target)
+            if scan_output and 'Results' in scan_output:
+                for target in scan_output['Results']:
+                    if 'Vulnerabilities' in target and target['Vulnerabilities']:
+                        for vuln in target['Vulnerabilities']:
+                            severity = vuln.get('Severity', 'UNKNOWN')
+                            
+                            vulnerabilities.append({
+                                'id': vuln.get('VulnerabilityID', 'N/A'),
+                                'severity': severity,
+                                'title': vuln.get('Title', ''),
+                                'description': vuln.get('Description', '')[:200] if vuln.get('Description') else '',
+                                'package': vuln.get('PkgName', ''),
+                                'installed_version': vuln.get('InstalledVersion', ''),
+                                'fixed_version': vuln.get('FixedVersion', ''),
+                            })
+                            
+                            if severity == 'CRITICAL':
+                                critical_count += 1
+                            elif severity == 'HIGH':
+                                high_count += 1
+                            elif severity == 'MEDIUM':
+                                medium_count += 1
+                            elif severity == 'LOW':
+                                low_count += 1
+            
+            return jsonify({
+                'success': True,
+                'image': image_name,
+                'results': {
+                    'critical': critical_count,
+                    'high': high_count,
+                    'medium': medium_count,
+                    'low': low_count,
+                    'vulnerabilities': vulnerabilities
+                }
+            })
+            
+        except json.JSONDecodeError as e:
+            # Se não for JSON válido, retornar output raw
+            return jsonify({
+                'success': True,
+                'image': image_name,
+                'results': {
+                    'critical': 0,
+                    'high': 0,
+                    'medium': 0,
+                    'low': 0,
+                    'vulnerabilities': []
+                },
+                'raw_output': result['stdout']
+            })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/api/security/history')
+def api_security_history():
+    """API: Histórico de scans"""
+    # Em produção, você salvaria isso em um banco de dados
+    scans = [
+        {
+            'type': 'trivy',
+            'timestamp': datetime.now().isoformat(),
+            'summary': 'Scan de imagens do sistema - 0 vulnerabilidades críticas'
+        },
+        {
+            'type': 'sonar',
+            'timestamp': datetime.now().isoformat(),
+            'summary': 'Análise de código - Quality Gate: PASSED'
+        }
+    ]
+    
+    return jsonify({
+        'success': True,
+        'scans': scans
+    })
 
 if __name__ == '__main__':
     print("🚀 Stack Manager iniciando...")

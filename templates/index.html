@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stack Manager Pro - DevOps Platform</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=5">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -27,6 +27,10 @@
             <a href="#deploy" class="nav-item" onclick="switchScreen('deploy')">
                 <span class="nav-icon">🚀</span>
                 <span class="nav-text">Deploy</span>
+            </a>
+            <a href="#security" class="nav-item" onclick="switchScreen('security')">
+                <span class="nav-icon">🔒</span>
+                <span class="nav-text">Segurança</span>
             </a>
         </nav>
 
@@ -348,6 +352,115 @@
                 </button>
             </div>
         </div>
+
+        <!-- Security Screen -->
+        <div class="screen" id="screen-security">
+            <h1>🔒 Segurança & Qualidade</h1>
+            
+            <section class="security-overview">
+                <h2>Visão Geral</h2>
+                <div class="metrics-grid">
+                    <div class="metric-card metric-info">
+                        <div class="metric-icon">🔍</div>
+                        <div class="metric-content">
+                            <div class="metric-value" id="trivyVulnerabilities">-</div>
+                            <div class="metric-label">Vulnerabilidades (Trivy)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card metric-warning">
+                        <div class="metric-icon">⚠️</div>
+                        <div class="metric-content">
+                            <div class="metric-value" id="sonarBugs">-</div>
+                            <div class="metric-label">Bugs (SonarQube)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card metric-danger">
+                        <div class="metric-icon">🐛</div>
+                        <div class="metric-content">
+                            <div class="metric-value" id="sonarVulnerabilities">-</div>
+                            <div class="metric-label">Vulnerabilidades (SonarQube)</div>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-card metric-success">
+                        <div class="metric-icon">📊</div>
+                        <div class="metric-content">
+                            <div class="metric-value" id="sonarCoverage">-</div>
+                            <div class="metric-label">Cobertura de Código</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="security-grid">
+                <!-- SonarQube Dashboard -->
+                <section class="security-card">
+                    <div class="card-header">
+                        <h2>📊 SonarQube - Análise de Código</h2>
+                        <button onclick="refreshSonarQube()" class="btn-icon" title="Atualizar">🔄</button>
+                    </div>
+                    <div id="sonarqubeStatus" class="status-indicator">
+                        <span class="status-dot status-loading"></span>
+                        <span>Verificando conexão...</span>
+                    </div>
+                    <div id="sonarqubeData" class="security-data">
+                        <div class="loading">Carregando dados do SonarQube...</div>
+                    </div>
+                    <div class="card-footer">
+                        <a href="http://localhost:9001" target="_blank" class="btn btn-secondary btn-sm">
+                            🔗 Abrir SonarQube
+                        </a>
+                    </div>
+                </section>
+
+                <!-- Trivy Dashboard -->
+                <section class="security-card">
+                    <div class="card-header">
+                        <h2>🔍 Trivy - Scan de Vulnerabilidades</h2>
+                        <button onclick="refreshTrivy()" class="btn-icon" title="Atualizar">🔄</button>
+                    </div>
+                    <div id="trivyStatus" class="status-indicator">
+                        <span class="status-dot status-loading"></span>
+                        <span>Verificando conexão...</span>
+                    </div>
+                    
+                    <!-- Formulário de Scan -->
+                    <div class="scan-form">
+                        <h3>Escanear Imagem Docker</h3>
+                        <div class="form-group">
+                            <input 
+                                type="text" 
+                                id="imageName" 
+                                placeholder="Ex: nginx:latest, alpine:3.18, node:18-alpine"
+                                class="form-input"
+                            />
+                            <button onclick="scanDockerImage()" class="btn btn-warning">
+                                🔍 Escanear
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="trivyData" class="security-data">
+                        <div class="loading">Aguardando scan...</div>
+                    </div>
+                    <div class="card-footer">
+                        <a href="http://localhost:8080/trivy" target="_blank" class="btn btn-secondary btn-sm">
+                            🔗 Abrir Trivy
+                        </a>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Scan History -->
+            <section class="scan-history">
+                <h2>📜 Histórico de Scans</h2>
+                <div id="scanHistory" class="history-list">
+                    <div class="loading">Carregando histórico...</div>
+                </div>
+            </section>
+        </div>
     </div>
 
     <!-- Console Modal -->
@@ -371,6 +484,6 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=5"></script>
 </body>
 </html>

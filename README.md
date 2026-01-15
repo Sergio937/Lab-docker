@@ -13,6 +13,8 @@ Aplicação web para gerenciar stacks Docker e provisionar ambiente DevOps compl
 - **Portainer** para gerenciamento visual
 - **Jenkins** para CI/CD
 - **SonarQube** para análise de código
+- **Grafana** para monitoramento e dashboards
+- **Trivy** para análise de vulnerabilidades
 
 ## 🏗️ Arquitetura
 
@@ -121,11 +123,15 @@ Este script irá:
 | Stack Manager  | http://localhost:5000| 5000  |
 
 ### Laboratório Completo
-| Serviço     | URL                  | Porta |
-|-------------|----------------------|-------|
-| HAProxy     | http://localhost:8080| 8080  |
-| Portainer   | http://localhost:9000| 9000  |
-| Traefik     | Via HAProxy          | -     |
+| Serviço     | URL                  | Porta | Credenciais |
+|-------------|----------------------|-------|-------------|
+| HAProxy     | http://localhost:8080| 8080  | -           |
+| Portainer   | http://localhost:9000| 9000  | Configurar no 1º acesso |
+| Jenkins     | http://localhost:8083| 8083  | Ver `/var/jenkins_home/secrets/initialAdminPassword` |
+| SonarQube   | http://localhost:9001| 9001  | admin/admin |
+| Grafana     | http://localhost:8084| 8084  | admin/admin |
+| Trivy       | http://localhost:8085| 8085  | -           |
+| Traefik     | Via HAProxy          | -     | -           |
 
 ## 📁 Estrutura do Projeto
 
@@ -149,7 +155,11 @@ Este script irá:
 │
 ├── stacks/                            # Definições de stacks
 │   ├── portainer-stack.yaml
-│   └── traefik-stack.yaml
+│   ├── traefik-stack.yaml
+│   ├── jenkins-stack.yaml
+│   ├── sonarqube-stack.yaml
+│   ├── grafana-stack.yaml
+│   └── trivy-stack.yaml
 │
 └── lab-devops/                        # Ambiente lab completo
     ├── docker-compose.yaml

@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  jenkins:
+    image: jenkins/jenkins:lts
+    networks:
+      - traefik-public
+
+    volumes:
+      - jenkins_data:/var/jenkins_home
+
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+      - JENKINS_OPTS=--prefix=/jenkins
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.jenkins.rule=PathPrefix(`/jenkins`)"
+        - "traefik.http.routers.jenkins.entrypoints=web"
+        - "traefik.http.services.jenkins.loadbalancer.server.port=8080"
+
+volumes:
+  jenkins_data:
+
+networks:
+  traefik-public:
+    external: true

@@ -18,6 +18,13 @@ services:
       placement:
         constraints:
           - node.role == manager
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.portainer.rule=Host(`portainer.local`)"
+        - "traefik.http.routers.portainer.entrypoints=web"
+        - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+        - "app=portainer"
+        - "environment=homologacao"
 
 volumes:
   portainer_data:

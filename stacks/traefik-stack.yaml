@@ -5,22 +5,32 @@ services:
     image: traefik:v2.11
     networks:
       - traefik-public
+
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+
     command:
       - --providers.docker
       - --providers.docker.swarmMode=true
       - --providers.docker.exposedbydefault=false
+
+      # Entrypoint HTTP
       - --entrypoints.web.address=:80
+
+      # Dashboard habilitado (modo homologação)
       - --api.dashboard=true
       - --api.insecure=true
+
     ports:
       - target: 80
         published: 80
         mode: host
+
+      # Porta do dashboard
       - target: 8080
         published: 8081
         mode: host
+
     deploy:
       mode: replicated
       replicas: 1

@@ -3,6 +3,7 @@ let currentAction = null;
 let autoRefresh = null;
 let stacksChart = null;
 let activityChart = null;
+let securityRefreshInterval = null;
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', function() {
@@ -81,6 +82,11 @@ function switchScreen(screenName) {
     
     // Scroll para o topo
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Se entrou na tela de segurança, carregar dados
+    if (screenName === 'security') {
+        loadSecurityData();
+    }
 }
 
 // Console Modal
@@ -117,7 +123,15 @@ async function loadAvailableStacks() {
                             ${stack.services.map(s => `<span class="service-tag">${s}</span>`).join('')}
                         </div>
                     ` : ''}
-                    ${stack.ports && stack.ports.length > 0 ? `
+                    ${stack.urls && stack.urls.length > 0 ? `
+                        <div class="ports-list">
+                            ${stack.urls.map(url => `
+                                <a href="${url}" target="_blank" class="port-link">
+                                    🌐 ${url.replace('http://', '')}
+                                </a>
+                            `).join('')}
+                        </div>
+                    ` : stack.ports && stack.ports.length > 0 ? `
                         <div class="ports-list">
                             ${stack.ports.map(port => `
                                 <a href="http://localhost:${port}" target="_blank" class="port-link">
@@ -165,7 +179,15 @@ async function refreshStatus() {
                 <div class="stack-info-left">
                     <h4>✅ ${capitalizeFirst(stack.name)}</h4>
                     <div class="info">${stack.services} serviço(s) rodando</div>
-                    ${stack.ports && stack.ports.length > 0 ? `
+                    ${stack.urls && stack.urls.length > 0 ? `
+                        <div class="ports-list-inline">
+                            ${stack.urls.map(url => `
+                                <a href="${url}" target="_blank" class="port-link-small">
+                                    🌐 ${url.replace('http://', '')}
+                                </a>
+                            `).join('')}
+                        </div>
+                    ` : stack.ports && stack.ports.length > 0 ? `
                         <div class="ports-list-inline">
                             ${stack.ports.map(port => `
                                 <a href="http://localhost:${port}" target="_blank" class="port-link-small">
@@ -804,7 +826,349 @@ async function updateDashboardMetrics() {
         console.error('Erro ao atualizar métricas:', error);
     }
 }
+// ==============================================
+// Security Functions
+// ==============================================
 
+function loadSecurityData() {
+    console.log('Loading security data...');
+    try {
+        refreshSonarQube();
+        refreshTrivy();
+        loadScanHistory();
+        
+        // Auto-refresh a cada 30 segundos quando estiver na tela de segurança
+        if (securityRefreshInterval) {
+            clearInterval(securityRefreshInterval);
+        }
+        securityRefreshInterval = setInterval(() => {
+            refreshSonarQube();
+            refreshTrivy();
+        }, 30000);
+    } catch (error) {
+        console.error('Error loading security data:', error);
+    }
+}
+
+async function refreshSonarQube() {
+    console.log('Refreshing SonarQube data...');
+    const statusEl = document.getElementById('sonarqubeStatus');
+    const dataEl = document.getElementById('sonarqubeData');
+    
+    if (!statusEl || !dataEl) {
+        console.error('SonarQube elements not found!');
+        return;
+    }
+    
+    try {
+        statusEl.innerHTML = '<span class="status-dot status-loading"></span><span>Conectando...</span>';
+        
+        const response = await fetch('/api/security/sonarqube');
+        const data = await response.json();
+        
+        console.log('SonarQube response:', data);
+        
+        if (data.success) {
+            statusEl.innerHTML = '<span class="status-dot status-online"></span><span>Online</span>';
+            
+            // Atualizar métricas principais
+            document.getElementById('sonarBugs').textContent = data.bugs || '0';
+            document.getElementById('sonarVulnerabilities').textContent = data.vulnerabilities || '0';
+            document.getElementById('sonarCoverage').textContent = data.coverage ? `${data.coverage}%` : '-';
+            
+            // Exibir detalhes
+            dataEl.innerHTML = `
+                <div class="security-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">🐛 Bugs:</span>
+                        <span class="metric-value ${data.bugs > 0 ? 'text-warning' : 'text-success'}">${data.bugs || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">🔴 Vulnerabilidades:</span>
+                        <span class="metric-value ${data.vulnerabilities > 0 ? 'text-danger' : 'text-success'}">${data.vulnerabilities || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">⚠️ Code Smells:</span>
+                        <span class="metric-value">${data.code_smells || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">📊 Cobertura:</span>
+                        <span class="metric-value">${data.coverage ? data.coverage + '%' : 'N/A'}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">📈 Qualidade:</span>
+                        <span class="metric-value ${data.quality_gate === 'OK' ? 'text-success' : 'text-danger'}">${data.quality_gate || 'N/A'}</span>
+                    </div>
+                    ${data.projects && data.projects.length > 0 ? `
+                        <div class="projects-list">
+                            <strong>Projetos Analisados:</strong>
+                            ${data.projects.map(p => `<span class="project-tag">${p}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        } else {
+            statusEl.innerHTML = '<span class="status-dot status-offline"></span><span>Offline</span>';
+            dataEl.innerHTML = `<div class="error-message">⚠️ ${data.error || 'Não foi possível conectar ao SonarQube'}</div>`;
+        }
+    } catch (error) {
+        statusEl.innerHTML = '<span class="status-dot status-offline"></span><span>Erro</span>';
+        dataEl.innerHTML = `<div class="error-message">❌ Erro ao conectar: ${error.message}</div>`;
+    }
+}
+
+async function refreshTrivy() {
+    console.log('Refreshing Trivy data...');
+    const statusEl = document.getElementById('trivyStatus');
+    const dataEl = document.getElementById('trivyData');
+    
+    if (!statusEl || !dataEl) {
+        console.error('Trivy elements not found!');
+        return;
+    }
+    
+    try {
+        statusEl.innerHTML = '<span class="status-dot status-loading"></span><span>Conectando...</span>';
+        
+        const response = await fetch('/api/security/trivy');
+        const data = await response.json();
+        
+        console.log('Trivy response:', data);
+        
+        if (data.success) {
+            statusEl.innerHTML = '<span class="status-dot status-online"></span><span>Online</span>';
+            
+            // Atualizar métrica principal
+            const totalVulns = (data.critical || 0) + (data.high || 0) + (data.medium || 0) + (data.low || 0);
+            document.getElementById('trivyVulnerabilities').textContent = totalVulns;
+            
+            // Exibir detalhes
+            dataEl.innerHTML = `
+                <div class="security-metrics">
+                    <div class="metric-row">
+                        <span class="metric-label">🔴 Críticas:</span>
+                        <span class="metric-value text-danger">${data.critical || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">🟠 Altas:</span>
+                        <span class="metric-value text-warning">${data.high || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">🟡 Médias:</span>
+                        <span class="metric-value text-info">${data.medium || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">🟢 Baixas:</span>
+                        <span class="metric-value text-success">${data.low || 0}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">📦 Total:</span>
+                        <span class="metric-value">${totalVulns}</span>
+                    </div>
+                    ${data.last_scan ? `
+                        <div class="metric-row">
+                            <span class="metric-label">🕐 Último Scan:</span>
+                            <span class="metric-value">${new Date(data.last_scan).toLocaleString('pt-BR')}</span>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        } else {
+            statusEl.innerHTML = '<span class="status-dot status-offline"></span><span>Offline</span>';
+            dataEl.innerHTML = `<div class="error-message">⚠️ ${data.error || 'Não foi possível conectar ao Trivy'}</div>`;
+        }
+    } catch (error) {
+        statusEl.innerHTML = '<span class="status-dot status-offline"></span><span>Erro</span>';
+        dataEl.innerHTML = `<div class="error-message">❌ Erro ao conectar: ${error.message}</div>`;
+    }
+}
+
+async function startTrivyScan() {
+    if (!confirm('Iniciar scan de vulnerabilidades? Isso pode levar alguns minutos.')) {
+        return;
+    }
+    
+    try {
+        logConsole('Iniciando scan do Trivy...', 'info');
+        const response = await fetch('/api/security/trivy/scan', { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            logConsole('✅ Scan iniciado com sucesso!', 'success');
+            setTimeout(() => refreshTrivy(), 2000);
+        } else {
+            logConsole(`❌ Erro ao iniciar scan: ${data.error}`, 'error');
+        }
+    } catch (error) {
+        logConsole(`❌ Erro: ${error.message}`, 'error');
+    }
+}
+
+async function scanDockerImage() {
+    const imageInput = document.getElementById('imageName');
+    const imageName = imageInput.value.trim();
+    
+    if (!imageName) {
+        alert('Por favor, digite o nome da imagem Docker');
+        return;
+    }
+    
+    const dataEl = document.getElementById('trivyData');
+    const statusEl = document.getElementById('trivyStatus');
+    
+    try {
+        statusEl.innerHTML = '<span class="status-dot status-loading"></span><span>Escaneando...</span>';
+        dataEl.innerHTML = `
+            <div class="scanning-message">
+                <div class="spinner"></div>
+                <p>🔍 Escaneando imagem: <strong>${imageName}</strong></p>
+                <p>Isso pode levar alguns minutos...</p>
+            </div>
+        `;
+        
+        logConsole(`Iniciando scan da imagem: ${imageName}`, 'info');
+        toggleConsoleModal();
+        
+        const response = await fetch('/api/security/trivy/scan-image', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ image: imageName })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            statusEl.innerHTML = '<span class="status-dot status-online"></span><span>Scan Concluído</span>';
+            logConsole(`✅ Scan concluído para ${imageName}`, 'success');
+            
+            // Processar resultados
+            displayTrivyResults(data.results, imageName);
+            
+            // Atualizar métrica principal
+            const totalVulns = (data.results.critical || 0) + (data.results.high || 0) + 
+                              (data.results.medium || 0) + (data.results.low || 0);
+            document.getElementById('trivyVulnerabilities').textContent = totalVulns;
+            
+        } else {
+            statusEl.innerHTML = '<span class="status-dot status-offline"></span><span>Erro no Scan</span>';
+            dataEl.innerHTML = `<div class="error-message">❌ ${data.error}</div>`;
+            logConsole(`❌ Erro no scan: ${data.error}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Scan error:', error);
+        statusEl.innerHTML = '<span class="status-dot status-offline"></span><span>Erro</span>';
+        dataEl.innerHTML = `<div class="error-message">❌ Erro: ${error.message}</div>`;
+        logConsole(`❌ Erro ao escanear: ${error.message}`, 'error');
+    }
+}
+
+function displayTrivyResults(results, imageName) {
+    const dataEl = document.getElementById('trivyData');
+    
+    const critical = results.critical || 0;
+    const high = results.high || 0;
+    const medium = results.medium || 0;
+    const low = results.low || 0;
+    const total = critical + high + medium + low;
+    
+    let statusClass = 'text-success';
+    let statusText = 'Seguro ✅';
+    
+    if (critical > 0) {
+        statusClass = 'text-danger';
+        statusText = 'Crítico ❌';
+    } else if (high > 0) {
+        statusClass = 'text-warning';
+        statusText = 'Atenção ⚠️';
+    } else if (medium > 0) {
+        statusClass = 'text-info';
+        statusText = 'Revisar 📋';
+    }
+    
+    dataEl.innerHTML = `
+        <div class="scan-results">
+            <div class="scan-header">
+                <h4>📦 ${imageName}</h4>
+                <span class="${statusClass} scan-status">${statusText}</span>
+            </div>
+            
+            <div class="security-metrics">
+                <div class="metric-row ${critical > 0 ? 'alert-critical' : ''}">
+                    <span class="metric-label">🔴 Críticas:</span>
+                    <span class="metric-value text-danger">${critical}</span>
+                </div>
+                <div class="metric-row ${high > 0 ? 'alert-high' : ''}">
+                    <span class="metric-label">🟠 Altas:</span>
+                    <span class="metric-value text-warning">${high}</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">🟡 Médias:</span>
+                    <span class="metric-value text-info">${medium}</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">🟢 Baixas:</span>
+                    <span class="metric-value text-success">${low}</span>
+                </div>
+                <div class="metric-row total-row">
+                    <span class="metric-label">📊 Total:</span>
+                    <span class="metric-value"><strong>${total}</strong></span>
+                </div>
+            </div>
+            
+            ${results.vulnerabilities && results.vulnerabilities.length > 0 ? `
+                <div class="vulnerabilities-list">
+                    <h4>🔍 Vulnerabilidades Encontradas:</h4>
+                    ${results.vulnerabilities.slice(0, 10).map(v => `
+                        <div class="vulnerability-item severity-${v.severity.toLowerCase()}">
+                            <div class="vuln-header">
+                                <span class="vuln-id">${v.id}</span>
+                                <span class="vuln-severity ${v.severity.toLowerCase()}">${v.severity}</span>
+                            </div>
+                            <div class="vuln-details">
+                                <strong>${v.title || v.id}</strong>
+                                <p>${v.description || 'Sem descrição'}</p>
+                                ${v.fixed_version ? `<p class="fix-available">✅ Fix: ${v.fixed_version}</p>` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                    ${results.vulnerabilities.length > 10 ? `
+                        <p class="more-vulns">... e mais ${results.vulnerabilities.length - 10} vulnerabilidades</p>
+                    ` : ''}
+                </div>
+            ` : '<p class="no-vulns">✅ Nenhuma vulnerabilidade encontrada!</p>'}
+        </div>
+    `;
+}
+
+async function loadScanHistory() {
+    const historyEl = document.getElementById('scanHistory');
+    
+    try {
+        const response = await fetch('/api/security/history');
+        const data = await response.json();
+        
+        if (data.success && data.scans && data.scans.length > 0) {
+            historyEl.innerHTML = data.scans.map(scan => `
+                <div class="history-item">
+                    <div class="history-header">
+                        <span class="history-type">${scan.type === 'sonar' ? '📊 SonarQube' : '🔍 Trivy'}</span>
+                        <span class="history-date">${new Date(scan.timestamp).toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div class="history-details">
+                        ${scan.summary || 'Scan concluído'}
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            historyEl.innerHTML = '<div class="loading">Nenhum scan encontrado</div>';
+        }
+    } catch (error) {
+        historyEl.innerHTML = '<div class="error-message">Erro ao carregar histórico</div>';
+    }
+}
 // Cleanup ao sair
 window.addEventListener('beforeunload', () => {
     if (autoRefresh) {

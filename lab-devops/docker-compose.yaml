@@ -10,11 +10,6 @@ services:
       - ./haproxy:/usr/local/etc/haproxy
     ports:
       - "8080:80"
-      - "8081:8081"
-      - "8082:8082"
-      - "8083:8083"
-      - "8084:8084"
-      - "8085:8085"
     restart: unless-stopped
 
   swarm1:
@@ -25,10 +20,7 @@ services:
       labnet:
         ipv4_address: 172.31.0.11
     ports:
-      - "9000:9000"
       - "2375:2375"
-    volumes:
-      - ../stacks:/stacks:ro
     environment:
       - DOCKER_TLS_CERTDIR=
     command: dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2375
@@ -41,8 +33,6 @@ services:
     networks:
       labnet:
         ipv4_address: 172.31.0.12
-    volumes:
-      - ../stacks:/stacks:ro
     environment:
       - DOCKER_TLS_CERTDIR=
     command: dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2375
@@ -61,13 +51,14 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ../stacks:/app/stacks
+      - ../lab-devops:/app/lab-devops
       - ../templates:/app/templates
       - ../static:/app/static
       - ../app.py:/app/app.py
       - ../subir_lab.sh:/app/subir_lab.sh:ro
       - ../destruir_lab.sh:/app/destruir_lab.sh:ro
     environment:
-      - JENKINS_URL=http://localhost:8083
+      - JENKINS_URL=http://localhost:8080/jenkins
       - JENKINS_USER=jenkins
       - JENKINS_TOKEN=11f32f0e212e58f102279c7ed10a624510
     depends_on:

@@ -86,8 +86,24 @@ log_success "Arquivos de configuração encontrados"
 # ---------------------------
 # Subindo infraestrutura
 # ---------------------------
-log_info "Subindo containers base..."
-docker compose up -d
+log_info "Verificando se containers já existem..."
+
+# Verificar se swarm1 existe
+if ! docker ps -a | grep -q lab-swarm1; then
+    log_error "Container lab-swarm1 não encontrado. Execute o docker-compose primeiro no host."
+    exit 1
+fi
+
+# Verificar se swarm2 existe
+if ! docker ps -a | grep -q lab-swarm2; then
+    log_error "Container lab-swarm2 não encontrado. Execute o docker-compose primeiro no host."
+    exit 1
+fi
+
+# Iniciar containers se estiverem parados
+log_info "Iniciando containers se necessário..."
+docker start lab-swarm1 lab-swarm2 2>/dev/null || true
+log_success "Containers verificados"
 
 log_info "Aguardando Docker daemon no swarm1..."
 TIMEOUT=60
@@ -182,6 +198,48 @@ log_success "Portainer iniciado (http://localhost:9000)"
 
 
 # ---------------------------
+# Deploy Jenkins
+# ---------------------------
+log_info "Fazendo deploy do Jenkins stack..."
+if docker exec lab-swarm1 docker stack deploy -c /stacks/jenkins-stack.yaml jenkins; then
+    log_success "Stack Jenkins deployado"
+else
+    log_error "Erro ao deployar stack Jenkins"
+    exit 1
+fi
+
+log_success "Jenkins iniciado (http://localhost:8083)"
+
+
+# ---------------------------
+# Deploy SonarQube
+# ---------------------------
+log_info "Fazendo deploy do SonarQube stack..."
+if docker exec lab-swarm1 docker stack deploy -c /stacks/sonarqube-stack.yaml sonarqube; then
+    log_success "Stack SonarQube deployado"
+else
+    log_error "Erro ao deployar stack SonarQube"
+    exit 1
+fi
+
+log_success "SonarQube iniciado (http://localhost:9001)"
+
+
+# ---------------------------
+# Deploy Trivy
+# ---------------------------
+log_info "Fazendo deploy do Trivy stack..."
+if docker exec lab-swarm1 docker stack deploy -c /stacks/trivy-stack.yaml trivy; then
+    log_success "Stack Trivy deployado"
+else
+    log_error "Erro ao deployar stack Trivy"
+    exit 1
+fi
+
+log_success "Trivy iniciado (http://localhost:8085)"
+
+
+# ---------------------------
 # Final
 # ---------------------------
 echo ""
@@ -191,6 +249,10 @@ echo -e "==============================================${NC}"
 echo ""
 echo -e "${BLUE}🌐 Traefik (HAProxy):${NC} http://localhost:8080"
 echo -e "${BLUE}🌐 Portainer:${NC}        http://localhost:9000"
+echo -e "${BLUE}🌐 Jenkins:${NC}          http://localhost:8083"
+echo -e "${BLUE}🌐 SonarQube:${NC}        http://localhost:9001"
+echo -e "${BLUE}🌐 Trivy:${NC}            http://localhost:8085"
+echo -e "${BLUE}🌐 Grafana:${NC}          http://localhost:8084"
 echo ""
 echo -e "${BLUE}📋 Comandos úteis:${NC}"
 echo "  • Ver logs:        docker compose logs -f"
