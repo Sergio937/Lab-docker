@@ -1169,6 +1169,36 @@ async function loadScanHistory() {
         historyEl.innerHTML = '<div class="error-message">Erro ao carregar histórico</div>';
     }
 }
+
+// Função para scan rápido de imagens predefinidas
+function quickScan(imageName) {
+    document.getElementById('imageName').value = imageName;
+    scanDockerImage();
+}
+
+// Função para limpar resultados do Trivy
+function clearTrivyResults() {
+    const dataEl = document.getElementById('trivyData');
+    const statusEl = document.getElementById('trivyStatus');
+    const imageInput = document.getElementById('imageName');
+    
+    dataEl.innerHTML = `
+        <div class="empty-state">
+            <span class="empty-icon">🔍</span>
+            <p>Aguardando scan de imagem...</p>
+            <small>Digite o nome de uma imagem acima e clique em "Escanear Imagem"</small>
+        </div>
+    `;
+    
+    statusEl.innerHTML = '<span class="status-dot status-loading"></span><span>Conectado ao lab-swarm1</span>';
+    imageInput.value = '';
+    
+    // Resetar métrica
+    document.getElementById('trivyVulnerabilities').textContent = '-';
+    
+    logConsole('🗑️ Resultados do Trivy limpos', 'info');
+}
+
 // Cleanup ao sair
 window.addEventListener('beforeunload', () => {
     if (autoRefresh) {

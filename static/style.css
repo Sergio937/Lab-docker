@@ -1317,18 +1317,43 @@ section h2::before {
 
 .scan-form {
     margin: 1rem 0;
-    padding: 1rem;
+    padding: 1.5rem;
     background: rgba(20, 184, 166, 0.05);
     border-radius: 8px;
+    border: 1px solid rgba(20, 184, 166, 0.2);
 }
 
 .scan-form h3 {
     color: #14b8a6;
-    font-size: 1rem;
-    margin-bottom: 0.75rem;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-description {
+    color: #94a3b8;
+    font-size: 0.875rem;
+    margin-bottom: 1.25rem;
+    line-height: 1.5;
 }
 
 .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    color: #cbd5e1;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.input-group {
     display: flex;
     gap: 0.75rem;
 }
@@ -1342,6 +1367,7 @@ section h2::before {
     color: #e2e8f0;
     font-family: inherit;
     font-size: 0.9rem;
+    transition: all 0.2s;
 }
 
 .form-input:focus {
@@ -1349,6 +1375,62 @@ section h2::before {
     border-color: #14b8a6;
     box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
 }
+
+.form-hint {
+    color: #64748b;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+.quick-scan-buttons {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(20, 184, 166, 0.2);
+}
+
+.section-label {
+    color: #cbd5e1;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.button-group-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: #64748b;
+}
+
+.empty-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state p {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    color: #94a3b8;
+}
+
+.empty-state small {
+    font-size: 0.85rem;
+    color: #64748b;
+}
+
 
 .scanning-message {
     text-align: center;
