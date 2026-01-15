@@ -1,264 +1,165 @@
 #!/bin/bash
 set -e
 
-# Cores para output
+# ===============================
+#  CORES E LOG
+# ===============================
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Função para logging
-log_info() {
-    echo -e "${BLUE}ℹ ${NC}$1"
-}
+log_info()    { echo -e "${BLUE}ℹ ${NC}$1"; }
+log_success() { echo -e "${GREEN}✓${NC} $1"; }
+log_warning() { echo -e "${YELLOW}⚠${NC} $1"; }
+log_error()   { echo -e "${RED}✗${NC} $1"; }
 
-log_success() {
-    echo -e "${GREEN}✓${NC} $1"
-}
-
-log_warning() {
-    echo -e "${YELLOW}⚠${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}✗${NC} $1"
-}
-
-# Função para verificar se um comando existe
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Verificar dependências
+# ===============================
+# DEPENDÊNCIAS
+# ===============================
 log_info "Verificando dependências..."
+
 if ! command_exists docker; then
-    log_error "Docker não encontrado. Por favor, instale o Docker primeiro."
+    log_error "Docker não encontrado"
     exit 1
 fi
 
 if ! command_exists docker compose; then
-    log_error "Docker Compose não encontrado. Por favor, instale o Docker Compose primeiro."
+    log_error "Docker Compose não encontrado"
     exit 1
 fi
 
-# ---------------------------
-# Verificando estrutura do lab
-# ---------------------------
-log_info "Verificando estrutura do lab-devops..."
+# ===============================
+# SUBINDO BASE (lab-devops)
+# ===============================
+log_info "Subindo infraestrutura base (lab-devops)..."
 
 if [ ! -d "lab-devops" ]; then
     log_error "Diretório lab-devops não encontrado!"
-    log_info "Crie a estrutura primeiro ou execute de outro diretório"
-    exit 1
-fi
-
-if [ ! -d "stacks" ]; then
-    log_error "Diretório stacks não encontrado!"
     exit 1
 fi
 
 cd lab-devops
 
-if [ ! -f "docker-compose.yaml" ]; then
-    log_error "Arquivo docker-compose.yaml não encontrado em lab-devops/"
-    exit 1
-fi
+log_info "Executando docker compose up -d..."
+docker compose up -d
+log_success "Infraestrutura base iniciada"
 
-if [ ! -f "haproxy/haproxy.cfg" ]; then
-    log_error "Arquivo haproxy/haproxy.cfg não encontrado!"
-    exit 1
-fi
+# ===============================
+# AGUARDAR CONTAINERS DO SWARM
+# ===============================
+log_info "Aguardando containers lab-swarm1 e lab-swarm2..."
 
-if [ ! -f "../stacks/traefik-stack.yaml" ]; then
-    log_error "Arquivo stacks/traefik-stack.yaml não encontrado!"
-    exit 1
-fi
-
-if [ ! -f "../stacks/portainer-stack.yaml" ]; then
-    log_error "Arquivo stacks/portainer-stack.yaml não encontrado!"
-    exit 1
-fi
-
-log_success "Arquivos de configuração encontrados"
-
-
-# ---------------------------
-# Subindo infraestrutura
-# ---------------------------
-log_info "Verificando se containers já existem..."
-
-# Verificar se swarm1 existe
-if ! docker ps -a | grep -q lab-swarm1; then
-    log_error "Container lab-swarm1 não encontrado. Execute o docker-compose primeiro no host."
-    exit 1
-fi
-
-# Verificar se swarm2 existe
-if ! docker ps -a | grep -q lab-swarm2; then
-    log_error "Container lab-swarm2 não encontrado. Execute o docker-compose primeiro no host."
-    exit 1
-fi
-
-# Iniciar containers se estiverem parados
-log_info "Iniciando containers se necessário..."
-docker start lab-swarm1 lab-swarm2 2>/dev/null || true
-log_success "Containers verificados"
-
-log_info "Aguardando Docker daemon no swarm1..."
 TIMEOUT=60
 ELAPSED=0
-until docker exec lab-swarm1 docker info >/dev/null 2>&1; do 
+
+until docker ps | grep -q lab-swarm1 && docker ps | grep -q lab-swarm2; do
     if [ $ELAPSED -ge $TIMEOUT ]; then
-        log_error "Timeout aguardando swarm1"
+        log_error "Timeout aguardando lab-swarm containers"
         exit 1
     fi
     sleep 2
     ELAPSED=$((ELAPSED + 2))
 done
-log_success "Swarm1 está pronto"
 
-log_info "Aguardando Docker daemon no swarm2..."
-ELAPSED=0
-until docker exec lab-swarm2 docker info >/dev/null 2>&1; do 
-    if [ $ELAPSED -ge $TIMEOUT ]; then
-        log_error "Timeout aguardando swarm2"
-        exit 1
-    fi
-    sleep 2
-    ELAPSED=$((ELAPSED + 2))
-done
-log_success "Swarm2 está pronto"
+log_success "Containers swarm ativos"
 
-# ---------------------------
-# Inicializando Swarm
-# ---------------------------
-log_info "Inicializando Swarm no swarm1..."
+cd ..
+
+# ===============================
+# VERIFICA ARQUIVOS NECESSÁRIOS
+# ===============================
+log_info "Verificando estrutura do lab..."
+
+[ ! -d "stacks" ] && log_error "Diretório stacks não encontrado" && exit 1
+
+cd lab-devops
+
+[ ! -f "haproxy/haproxy.cfg" ] && log_error "haproxy.cfg não encontrado" && exit 1
+[ ! -f "../stacks/traefik-stack.yaml" ] && log_error "traefik-stack.yaml não encontrado" && exit 1
+[ ! -f "../stacks/portainer-stack.yaml" ] && log_error "portainer-stack.yaml não encontrado" && exit 1
+
+log_success "Estrutura validada"
+
+# ===============================
+# AGUARDAR DOCKER DAEMON INTERNO
+# ===============================
+log_info "Aguardando Docker interno do swarm1..."
+until docker exec lab-swarm1 docker info >/dev/null 2>&1; do sleep 2; done
+log_success "Docker swarm1 pronto"
+
+log_info "Aguardando Docker interno do swarm2..."
+until docker exec lab-swarm2 docker info >/dev/null 2>&1; do sleep 2; done
+log_success "Docker swarm2 pronto"
+
+# ===============================
+# INICIALIZAR SWARM
+# ===============================
+log_info "Inicializando Docker Swarm..."
+
 docker exec lab-swarm1 docker swarm init --advertise-addr 172.31.0.11 2>/dev/null || true
 
-ELAPSED=0
-until docker exec lab-swarm1 docker info | grep -q "Swarm: active"; do 
-    if [ $ELAPSED -ge $TIMEOUT ]; then
-        log_error "Timeout inicializando swarm"
-        exit 1
-    fi
-    sleep 2
-    ELAPSED=$((ELAPSED + 2))
-done
+until docker exec lab-swarm1 docker info | grep -q "Swarm: active"; do sleep 2; done
 log_success "Swarm inicializado"
 
-log_info "Conectando worker (swarm2)..."
+log_info "Conectando worker..."
+
 WORKER_TOKEN=$(docker exec lab-swarm1 docker swarm join-token -q worker)
 docker exec lab-swarm2 docker swarm join --token $WORKER_TOKEN 172.31.0.11:2377 2>/dev/null || true
+
 log_success "Worker conectado"
 
+# ===============================
+# REDES OVERLAY
+# ===============================
+log_info "Criando redes overlay..."
 
-# ---------------------------
-# Rede pública Traefik
-# ---------------------------
-log_info "Criando rede traefik-public..."
 docker exec lab-swarm1 docker network create --driver overlay traefik-public 2>/dev/null || true
-log_success "Rede traefik-public criada"
-
-log_info "Criando rede devops-network..."
 docker exec lab-swarm1 docker network create --driver overlay devops-network 2>/dev/null || true
-log_success "Rede devops-network criada"
 
-# ---------------------------
-# Subindo Traefik
-# ---------------------------
-log_info "Fazendo deploy do Traefik stack..."
-if docker exec lab-swarm1 docker stack deploy -c /stacks/traefik-stack.yaml traefik; then
-    log_success "Stack Traefik deployado"
-else
-    log_error "Erro ao deployar stack Traefik"
-    log_info "Verificando conteúdo do arquivo..."
-    docker exec lab-swarm1 cat /tmp/traefik-stack.yaml
-    exit 1
-fi
+log_success "Redes criadas"
 
-# Aguardar Traefik estar pronto
-sleep 5
+# ===============================
+# DEPLOY STACKS
+# ===============================
+deploy_stack () {
+    STACK_NAME=$1
+    FILE_PATH=$2
+    log_info "Deploy stack $STACK_NAME..."
+    echo "DEBUG: docker exec lab-swarm1 docker stack deploy -c /stacks/$FILE_PATH $STACK_NAME"
+    echo "DEBUG: Listando arquivos em /stacks dentro do lab-swarm1:"
+    docker exec lab-swarm1 ls -l /stacks/
+    docker exec lab-swarm1 docker stack deploy -c /stacks/$FILE_PATH $STACK_NAME
+    log_success "Stack $STACK_NAME deployada"
+}
 
+deploy_stack traefik traefik-stack.yaml
+deploy_stack portainer portainer-stack.yaml
+deploy_stack jenkins jenkins-stack.yaml
+deploy_stack sonarqube sonarqube-stack.yaml
+deploy_stack trivy trivy-stack.yaml
 
-# ---------------------------
-# Deploy Portainer
-# ---------------------------
-log_info "Fazendo deploy do Portainer stack..."
-if docker exec lab-swarm1 docker stack deploy -c /stacks/portainer-stack.yaml portainer; then
-    log_success "Stack Portainer deployado"
-else
-    log_error "Erro ao deployar stack Portainer"
-    log_info "Verificando conteúdo do arquivo..."
-    docker exec lab-swarm1 cat /tmp/portainer-stack.yaml
-    exit 1
-fi
-
-log_success "Portainer iniciado (http://localhost:9000)"
-
-
-# ---------------------------
-# Deploy Jenkins
-# ---------------------------
-log_info "Fazendo deploy do Jenkins stack..."
-if docker exec lab-swarm1 docker stack deploy -c /stacks/jenkins-stack.yaml jenkins; then
-    log_success "Stack Jenkins deployado"
-else
-    log_error "Erro ao deployar stack Jenkins"
-    exit 1
-fi
-
-log_success "Jenkins iniciado (http://localhost:8083)"
-
-
-# ---------------------------
-# Deploy SonarQube
-# ---------------------------
-log_info "Fazendo deploy do SonarQube stack..."
-if docker exec lab-swarm1 docker stack deploy -c /stacks/sonarqube-stack.yaml sonarqube; then
-    log_success "Stack SonarQube deployado"
-else
-    log_error "Erro ao deployar stack SonarQube"
-    exit 1
-fi
-
-log_success "SonarQube iniciado (http://localhost:9001)"
-
-
-# ---------------------------
-# Deploy Trivy
-# ---------------------------
-log_info "Fazendo deploy do Trivy stack..."
-if docker exec lab-swarm1 docker stack deploy -c /stacks/trivy-stack.yaml trivy; then
-    log_success "Stack Trivy deployado"
-else
-    log_error "Erro ao deployar stack Trivy"
-    exit 1
-fi
-
-log_success "Trivy iniciado (http://localhost:8085)"
-
-
-# ---------------------------
-# Final
-# ---------------------------
+# ===============================
+# FINAL
+# ===============================
 echo ""
 echo -e "${GREEN}=============================================="
-echo "✅ LAB DEVOPS CRIADO COM SUCESSO!"
+echo "🚀 LAB DEVOPS INICIADO COM SUCESSO!"
 echo -e "==============================================${NC}"
 echo ""
-echo -e "${BLUE}🌐 Traefik (HAProxy):${NC} http://localhost:8080"
-echo -e "${BLUE}🌐 Portainer:${NC}        http://localhost:9000"
-echo -e "${BLUE}🌐 Jenkins:${NC}          http://localhost:8083"
-echo -e "${BLUE}🌐 SonarQube:${NC}        http://localhost:9001"
-echo -e "${BLUE}🌐 Trivy:${NC}            http://localhost:8085"
-echo -e "${BLUE}🌐 Grafana:${NC}          http://localhost:8084"
+echo -e "${BLUE}🌐 HAProxy:${NC}     http://localhost:8080"
+echo -e "${BLUE}🌐 Portainer:${NC}   http://localhost:9000"
+echo -e "${BLUE}🌐 Jenkins:${NC}     http://localhost:8083"
+echo -e "${BLUE}🌐 SonarQube:${NC}   http://localhost:9001"
+echo -e "${BLUE}🌐 Trivy:${NC}       http://localhost:8085"
 echo ""
-echo -e "${BLUE}📋 Comandos úteis:${NC}"
-echo "  • Ver logs:        docker compose logs -f"
-echo "  • Parar lab:       docker compose down"
-echo "  • Status swarm:    docker exec lab-swarm1 docker node ls"
-echo "  • Lista stacks:    docker exec lab-swarm1 docker stack ls"
-echo "  • Lista services:  docker exec lab-swarm1 docker service ls"
+echo -e "${BLUE}📌 Para destruir tudo:${NC}"
+echo "cd lab-devops && docker compose down"
 echo ""
 echo -e "${GREEN}==============================================${NC}"
+log_success "Script finalizado"

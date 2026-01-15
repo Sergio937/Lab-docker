@@ -24,6 +24,9 @@ services:
     environment:
       - DOCKER_TLS_CERTDIR=
     command: dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2375
+    volumes:
+      - ../stacks:/stacks
+      - /var/lib/docker
     restart: unless-stopped
 
   swarm2:
@@ -36,6 +39,9 @@ services:
     environment:
       - DOCKER_TLS_CERTDIR=
     command: dockerd --host=unix:///var/run/docker.sock --host=tcp://0.0.0.0:2375
+    volumes:
+      - ../stacks:/stacks
+      - /var/lib/docker
     restart: unless-stopped
 
   stack-manager:
