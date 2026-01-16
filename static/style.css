@@ -737,6 +737,8 @@ section h2::before {
     border-radius: 16px;
     width: 90%;
     max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     animation: slideUp 0.3s ease;
 }
@@ -754,6 +756,7 @@ section h2::before {
 
 .modal-large {
     max-width: 900px;
+    max-height: 95vh;
 }
 
 .modal-content h3 {

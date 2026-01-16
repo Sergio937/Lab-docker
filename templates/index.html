@@ -58,30 +58,12 @@
             </div>
         </div>
 
+        <!-- Container Principal -->
         <div class="container">
             <!-- Dashboard Screen -->
             <div class="screen active" id="screen-dashboard">
-            <!-- Controle do Lab -->
-            <section class="lab-controls">
-                <h2>🎛️ Controle do Lab</h2>
-                <div class="button-group">
-                    <button onclick="confirmStartLab()" class="btn btn-success">
-                        <span class="icon">▶️</span> Iniciar Lab
-                    </button>
-                    <button onclick="confirmDestroyLab()" class="btn btn-danger">
-                        <span class="icon">💥</span> Destruir Lab
-                    </button>
-                    <button onclick="refreshStatus()" class="btn btn-primary">
-                        <span class="icon">🔄</span> Atualizar
-                    </button>
-                    <button onclick="showCreateStackModal()" class="btn btn-warning">
-                        <span class="icon">➕</span> Nova Stack
-                    </button>
-                </div>
-            </section>
-
-            <section class="dashboard-metrics">
-                <h2>📊 Dashboard</h2>
+                <section class="dashboard-metrics">
+                    <h2>📊 Dashboard</h2>
                 
                 <div class="metrics-grid">
                     <div class="metric-card">
@@ -143,7 +125,17 @@
 
             <!-- Deploy Screen -->
             <div class="screen" id="screen-deploy">
-            <section class="available-stacks">
+                <!-- Controle do Lab -->
+                <section class="lab-controls">
+                    <h2>🎛️ Controle do Lab</h2>
+                    <div class="button-group">
+                        <button onclick="showCreateStackModal()" class="btn btn-warning">
+                            <span class="icon">➕</span> Nova Stack
+                        </button>
+                    </div>
+                </section>
+
+                <section class="available-stacks">
                 <h2>📦 Stacks Disponíveis para Deploy</h2>
                 <div id="availableStacksList" class="stack-grid">
                     <p class="loading">Carregando...</p>
@@ -290,6 +282,7 @@
             💻
         </button>
     </div>
+    <!-- Fim do main-wrapper -->
 
     <!-- Modal de Criação de Stack -->
     <div id="createStackModal" class="modal">
