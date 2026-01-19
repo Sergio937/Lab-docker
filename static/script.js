@@ -1355,36 +1355,66 @@ async function loadRecentBuilds() {
 // CONSOLE FUNCTIONS
 let currentServer = null;
 let terminalHistory = [];
+let historyIndex = -1;
 
 function connectServer(serverName, type) {
-    currentServer = { name: serverName, type: type };
-    
-    const terminalSection = document.getElementById('terminalSection');
-    const terminalServerName = document.getElementById('terminalServerName');
-    const terminalPrompt = document.getElementById('terminalPrompt');
-    const terminalOutput = document.getElementById('terminalOutput');
-    
-    terminalSection.style.display = 'block';
-    terminalServerName.textContent = `Terminal - ${serverName}`;
-    terminalPrompt.textContent = `${serverName}$`;
-    
-    // Simular conexão
-    terminalOutput.innerHTML = `
-        <div class="terminal-line" style="color: #10b981;">✅ Conectado ao servidor ${serverName} via ${type.toUpperCase()}</div>
-        <div class="terminal-line" style="color: #94a3b8;">Tipo: ${type.toUpperCase()} | Status: Online</div>
-        <div class="terminal-line" style="color: #94a3b8;">Digite comandos abaixo ou use 'help' para ajuda</div>
-        <div class="terminal-line" style="margin-top: 0.5rem;"></div>
-    `;
-    
-    // Focar no input
-    document.getElementById('terminalInput').focus();
-    
-    logConsole(`🔗 Conectado ao ${serverName} via ${type.toUpperCase()}`, 'success');
-    
-    // Scroll suave até o terminal
-    setTimeout(() => {
-        terminalSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
+    // Primeiro testar conexão com o servidor
+    testServerConnection(serverName, type);
+}
+
+async function testServerConnection(serverName, type) {
+    try {
+        logConsole(`🔗 Conectando ao ${serverName}...`, 'info');
+        
+        const response = await fetch('/api/terminal/ssh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                host: serverName,
+                port: 22,
+                user: 'root'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            currentServer = { name: serverName, type: type };
+            
+            const terminalSection = document.getElementById('terminalSection');
+            const terminalServerName = document.getElementById('terminalServerName');
+            const terminalPrompt = document.getElementById('terminalPrompt');
+            const terminalOutput = document.getElementById('terminalOutput');
+            
+            terminalSection.style.display = 'block';
+            terminalServerName.textContent = `Terminal - ${serverName}`;
+            terminalPrompt.textContent = `${serverName}$`;
+            
+            // Mostrar mensagem de conexão
+            terminalOutput.innerHTML = `
+                <div class="terminal-line" style="color: #10b981;">${data.message}</div>
+                <div class="terminal-line" style="color: #94a3b8;">Tipo: ${type.toUpperCase()} | Status: Online</div>
+                <div class="terminal-line" style="color: #94a3b8;">Digite comandos Linux/Docker abaixo</div>
+                ${data.note ? `<div class="terminal-line" style="color: #f59e0b;">💡 ${data.note}</div>` : ''}
+                <div class="terminal-line" style="margin-top: 0.5rem;"></div>
+            `;
+            
+            // Focar no input
+            document.getElementById('terminalInput').focus();
+            
+            logConsole(`✅ ${data.message}`, 'success');
+            
+            // Scroll suave até o terminal
+            setTimeout(() => {
+                terminalSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        } else {
+            logConsole(data.error || '❌ Falha na conexão', 'error');
+        }
+        
+    } catch (error) {
+        logConsole('❌ Erro ao conectar: ' + error.message, 'error');
+    }
 }
 
 function openCustomConnection() {
@@ -1412,7 +1442,7 @@ function connectCustomServer(event) {
     closeCustomConnectionModal();
     
     const serverName = `${user}@${host}:${port}`;
-    connectServer(serverName, type);
+    testServerConnection(host, type);
 }
 
 function handleTerminalInput(event) {
@@ -1423,93 +1453,165 @@ function handleTerminalInput(event) {
         if (command) {
             executeCommand(command);
             terminalHistory.push(command);
+            historyIndex = terminalHistory.length;
             input.value = '';
+        }
+    } else if (event.key === 'ArrowUp') {
+        // Navegar histórico para cima
+        event.preventDefault();
+        if (historyIndex > 0) {
+            historyIndex--;
+            event.target.value = terminalHistory[historyIndex];
+        }
+    } else if (event.key === 'ArrowDown') {
+        // Navegar histórico para baixo
+        event.preventDefault();
+        if (historyIndex < terminalHistory.length - 1) {
+            historyIndex++;
+            event.target.value = terminalHistory[historyIndex];
+        } else {
+            historyIndex = terminalHistory.length;
+            event.target.value = '';
         }
     }
 }
 
-function executeCommand(command) {
+async function executeCommand(command) {
     const terminalOutput = document.getElementById('terminalOutput');
     const prompt = document.getElementById('terminalPrompt').textContent;
     
     // Adicionar comando ao output
     const commandLine = document.createElement('div');
     commandLine.className = 'terminal-line';
-    commandLine.innerHTML = `<span style="color: #14b8a6;">${prompt}</span> ${command}`;
+    commandLine.innerHTML = `<span style="color: #14b8a6;">${prompt}</span> ${escapeHtml(command)}`;
     terminalOutput.appendChild(commandLine);
     
-    // Simular resposta do comando
-    const response = getCommandResponse(command);
-    const responseLine = document.createElement('div');
-    responseLine.className = 'terminal-line';
-    responseLine.innerHTML = response;
-    responseLine.style.marginBottom = '0.5rem';
-    terminalOutput.appendChild(responseLine);
+    // Comando especial clear
+    if (command.toLowerCase() === 'clear') {
+        clearTerminal();
+        return;
+    }
+    
+    // Comando especial help
+    if (command.toLowerCase() === 'help') {
+        const helpLine = document.createElement('div');
+        helpLine.className = 'terminal-line';
+        helpLine.innerHTML = `<div style="color: #94a3b8; margin-bottom: 0.5rem;">
+            <strong style="color: #14b8a6;">Comandos disponíveis:</strong><br><br>
+            <strong style="color: #e2e8f0;">Sistema:</strong><br>
+            - ls, ls -la          : listar arquivos<br>
+            - pwd                 : diretório atual<br>
+            - whoami              : usuário atual<br>
+            - hostname            : nome do host<br>
+            - df -h               : espaço em disco<br>
+            - free -h             : memória disponível<br>
+            - top, htop           : processos<br><br>
+            <strong style="color: #e2e8f0;">Docker:</strong><br>
+            - docker ps           : containers rodando<br>
+            - docker ps -a        : todos containers<br>
+            - docker images       : listar imagens<br>
+            - docker service ls   : listar serviços swarm<br>
+            - docker stack ls     : listar stacks<br>
+            - docker node ls      : listar nodes<br>
+            - docker logs [nome]  : logs do container<br><br>
+            <strong style="color: #e2e8f0;">Terminal:</strong><br>
+            - clear               : limpar terminal<br>
+            - help                : mostrar esta ajuda<br>
+            - exit                : fechar terminal<br>
+        </div>`;
+        terminalOutput.appendChild(helpLine);
+        scrollTerminalToBottom();
+        return;
+    }
+    
+    // Comando especial exit
+    if (command.toLowerCase() === 'exit') {
+        const exitLine = document.createElement('div');
+        exitLine.className = 'terminal-line';
+        exitLine.innerHTML = '<span style="color: #10b981;">👋 Desconectando...</span>';
+        terminalOutput.appendChild(exitLine);
+        scrollTerminalToBottom();
+        
+        setTimeout(() => {
+            closeTerminal();
+        }, 500);
+        return;
+    }
+    
+    // Mostrar loading
+    const loadingLine = document.createElement('div');
+    loadingLine.className = 'terminal-line';
+    loadingLine.innerHTML = '<span style="color: #f59e0b;">⏳ Executando...</span>';
+    loadingLine.id = 'terminal-loading';
+    terminalOutput.appendChild(loadingLine);
     
     // Scroll para o final
+    scrollTerminalToBottom();
+    
+    try {
+        // Executar comando no backend
+        const response = await fetch('/api/terminal/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                command: command,
+                server: currentServer ? currentServer.name : 'local'
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Remover loading
+        const loading = document.getElementById('terminal-loading');
+        if (loading) loading.remove();
+        
+        // Adicionar resposta
+        const responseLine = document.createElement('div');
+        responseLine.className = 'terminal-line';
+        
+        if (data.success) {
+            const output = data.output || 'Comando executado com sucesso';
+            responseLine.innerHTML = `<pre style="color: #e2e8f0; margin: 0; white-space: pre-wrap; font-family: inherit;">${escapeHtml(output)}</pre>`;
+        } else {
+            const error = data.error || data.output || 'Erro desconhecido';
+            responseLine.innerHTML = `<span style="color: #ef4444;">${escapeHtml(error)}</span>`;
+        }
+        
+        responseLine.style.marginBottom = '0.5rem';
+        terminalOutput.appendChild(responseLine);
+        
+    } catch (error) {
+        // Remover loading
+        const loading = document.getElementById('terminal-loading');
+        if (loading) loading.remove();
+        
+        // Mostrar erro
+        const errorLine = document.createElement('div');
+        errorLine.className = 'terminal-line';
+        errorLine.innerHTML = `<span style="color: #ef4444;">❌ Erro: ${escapeHtml(error.message)}</span>`;
+        errorLine.style.marginBottom = '0.5rem';
+        terminalOutput.appendChild(errorLine);
+    }
+    
+    // Scroll para o final
+    scrollTerminalToBottom();
+}
+
+function scrollTerminalToBottom() {
     const terminalBody = document.getElementById('terminalBody');
     terminalBody.scrollTop = terminalBody.scrollHeight;
 }
 
-function getCommandResponse(command) {
-    const cmd = command.toLowerCase();
-    
-    if (cmd === 'help') {
-        return `<div style="color: #94a3b8;">
-            Comandos disponíveis:<br>
-            - ls: listar arquivos<br>
-            - pwd: diretório atual<br>
-            - whoami: usuário atual<br>
-            - docker ps: listar containers<br>
-            - docker images: listar imagens<br>
-            - clear: limpar terminal<br>
-            - help: mostrar ajuda
-        </div>`;
-    }
-    
-    if (cmd === 'ls' || cmd === 'ls -la') {
-        return `<div style="color: #e2e8f0;">
-            drwxr-xr-x  5 user user 4096 Jan 19 10:30 .<br>
-            drwxr-xr-x 25 user user 4096 Jan 18 15:20 ..<br>
-            -rw-r--r--  1 user user  220 Jan 10 09:15 .bash_logout<br>
-            -rw-r--r--  1 user user 3526 Jan 10 09:15 .bashrc<br>
-            drwxr-xr-x  3 user user 4096 Jan 15 14:30 docker<br>
-            -rw-r--r--  1 user user  807 Jan 10 09:15 .profile
-        </div>`;
-    }
-    
-    if (cmd === 'pwd') {
-        return `<div style="color: #e2e8f0;">/home/user</div>`;
-    }
-    
-    if (cmd === 'whoami') {
-        return `<div style="color: #e2e8f0;">user</div>`;
-    }
-    
-    if (cmd === 'docker ps') {
-        return `<div style="color: #e2e8f0;">
-            CONTAINER ID   IMAGE              COMMAND                  STATUS         PORTS<br>
-            a1b2c3d4e5f6   portainer/portainer "portainer"              Up 2 hours     0.0.0.0:9000->9000/tcp<br>
-            f6e5d4c3b2a1   jenkins/jenkins     "/sbin/tini -- /usr/…"   Up 3 hours     0.0.0.0:8081->8080/tcp<br>
-            b2a1f6e5d4c3   sonarqube:latest    "bin/run.sh bin/sona…"   Up 4 hours     0.0.0.0:9001->9000/tcp
-        </div>`;
-    }
-    
-    if (cmd === 'docker images') {
-        return `<div style="color: #e2e8f0;">
-            REPOSITORY            TAG       IMAGE ID       CREATED        SIZE<br>
-            portainer/portainer   latest    abc123def456   2 weeks ago    294MB<br>
-            jenkins/jenkins       latest    def456abc123   3 weeks ago    441MB<br>
-            sonarqube            latest    123abc456def   1 month ago    567MB
-        </div>`;
-    }
-    
-    if (cmd === 'clear') {
-        clearTerminal();
-        return '';
-    }
-    
-    return `<div style="color: #f59e0b;">bash: ${command}: command not found</div>`;
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 function clearTerminal() {
@@ -1522,6 +1624,7 @@ function clearTerminal() {
     } else {
         terminalOutput.innerHTML = '';
     }
+    scrollTerminalToBottom();
 }
 
 function closeTerminal() {
@@ -1529,7 +1632,10 @@ function closeTerminal() {
     terminalSection.style.display = 'none';
     currentServer = null;
     terminalHistory = [];
-    clearTerminal();
+    historyIndex = -1;
+    
+    const terminalOutput = document.getElementById('terminalOutput');
+    terminalOutput.innerHTML = '';
 }
 
 // Cleanup ao sair

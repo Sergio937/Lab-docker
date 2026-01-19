@@ -1213,6 +1213,102 @@ def api_security_history():
         'scans': scans
     })
 
+@app.route('/api/terminal/execute', methods=['POST'])
+def execute_terminal_command():
+    """Executa comando em um servidor via SSH ou localmente"""
+    try:
+        data = request.json
+        command = data.get('command', '')
+        server = data.get('server', 'local')
+        
+        if not command:
+            return jsonify({'success': False, 'error': 'Comando vazio'})
+        
+        # Executar localmente ou via docker exec
+        if server in ['lab-swarm1', 'lab-swarm2']:
+            # Executar comando dentro do container Docker (usar sh ao invés de bash)
+            full_command = f'docker exec {server} sh -c "{command}"'
+        else:
+            # Executar comando localmente (com cuidado!)
+            # Validar comando para segurança
+            dangerous_commands = ['rm -rf /', 'mkfs', 'dd if=', ':(){:|:&};:', 'chmod -R 777 /']
+            if any(danger in command for danger in dangerous_commands):
+                return jsonify({
+                    'success': False,
+                    'error': '❌ Comando potencialmente perigoso bloqueado'
+                })
+            full_command = command
+        
+        # Executar comando
+        result = subprocess.run(
+            full_command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        output = result.stdout if result.stdout else result.stderr
+        
+        return jsonify({
+            'success': result.returncode == 0,
+            'output': output,
+            'returncode': result.returncode
+        })
+        
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'error': '⏱️ Comando excedeu tempo limite de 30 segundos'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'❌ Erro ao executar comando: {str(e)}'
+        })
+
+@app.route('/api/terminal/ssh', methods=['POST'])
+def ssh_connect():
+    """Conecta a um servidor via SSH"""
+    try:
+        data = request.json
+        host = data.get('host')
+        port = data.get('port', 22)
+        user = data.get('user')
+        password = data.get('password', '')
+        
+        # Verificar se é um dos servidores Docker locais
+        if host in ['lab-swarm1', 'lab-swarm2']:
+            # Testar conexão com container
+            test_cmd = f'docker exec {host} echo "OK"'
+            result = subprocess.run(test_cmd, shell=True, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                return jsonify({
+                    'success': True,
+                    'message': f'✅ Conectado ao {host}',
+                    'server': host
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'❌ Container {host} não está rodando'
+                })
+        
+        # Para servidores externos, retornar sucesso (implementar paramiko se necessário)
+        return jsonify({
+            'success': True,
+            'message': f'✅ Conexão SSH simulada para {user}@{host}:{port}',
+            'server': f'{user}@{host}',
+            'note': 'Para SSH real, instale: pip install paramiko'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'❌ Erro ao conectar: {str(e)}'
+        })
+
 if __name__ == '__main__':
     print("🚀 Stack Manager iniciando...")
     print("📁 Stacks disponíveis:")
