@@ -87,6 +87,12 @@ function switchScreen(screenName) {
     if (screenName === 'security') {
         loadSecurityData();
     }
+    
+    // Se entrou na tela de CI/CD, carregar dados
+    if (screenName === 'cicd') {
+        refreshJenkins();
+        loadRecentBuilds();
+    }
 }
 
 // Console Modal
@@ -1191,6 +1197,154 @@ function clearTrivyResults() {
     document.getElementById('trivyVulnerabilities').textContent = '-';
     
     logConsole('🗑️ Resultados do Trivy limpos', 'info');
+}
+
+// CI/CD Functions
+async function refreshJenkins() {
+    const statusEl = document.getElementById('jenkinsStatus');
+    const dataEl = document.getElementById('jenkinsData');
+    
+    try {
+        statusEl.innerHTML = '<span class="status-dot status-loading"></span><span>Conectando ao Jenkins...</span>';
+        
+        // Simular dados do Jenkins (substituir com API real)
+        const jenkinsData = {
+            status: 'online',
+            jobs: [
+                { name: 'build-frontend', status: 'success', lastBuild: '2m ago' },
+                { name: 'build-backend', status: 'success', lastBuild: '5m ago' },
+                { name: 'deploy-production', status: 'running', lastBuild: 'now' }
+            ]
+        };
+        
+        if (jenkinsData.status === 'online') {
+            statusEl.innerHTML = '<span class="status-dot status-online"></span><span>Jenkins Online</span>';
+            
+            let html = '<div class="security-metrics">';
+            jenkinsData.jobs.forEach(job => {
+                const statusClass = job.status === 'success' ? 'text-success' : 
+                                  job.status === 'running' ? 'text-warning' : 'text-danger';
+                const icon = job.status === 'success' ? '✅' : 
+                           job.status === 'running' ? '🔄' : '❌';
+                
+                html += `
+                    <div class="metric-row">
+                        <span class="metric-label">${icon} ${job.name}</span>
+                        <span class="metric-value ${statusClass}">${job.lastBuild}</span>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            dataEl.innerHTML = html;
+            
+            // Atualizar métricas
+            updateCICDMetrics(jenkinsData);
+        } else {
+            statusEl.innerHTML = '<span class="status-dot status-offline"></span><span>Jenkins Offline</span>';
+            dataEl.innerHTML = '<div class="error-message">Jenkins não está respondendo</div>';
+        }
+        
+    } catch (error) {
+        statusEl.innerHTML = '<span class="status-dot status-offline"></span><span>Erro de Conexão</span>';
+        dataEl.innerHTML = '<div class="error-message">Erro ao conectar com Jenkins: ' + error.message + '</div>';
+    }
+}
+
+function updateCICDMetrics(data) {
+    const successCount = data.jobs.filter(j => j.status === 'success').length;
+    const failedCount = data.jobs.filter(j => j.status === 'failed').length;
+    const runningCount = data.jobs.filter(j => j.status === 'running').length;
+    
+    document.getElementById('successfulBuilds').textContent = successCount;
+    document.getElementById('failedBuilds').textContent = failedCount;
+    document.getElementById('activePipelines').textContent = runningCount;
+    document.getElementById('avgBuildTime').textContent = '2.5m';
+}
+
+async function triggerBuild() {
+    try {
+        logConsole('▶️ Iniciando novo build...', 'info');
+        
+        // Simular trigger de build (substituir com API real)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        logConsole('✅ Build iniciado com sucesso!', 'success');
+        refreshJenkins();
+        loadRecentBuilds();
+        
+    } catch (error) {
+        logConsole('❌ Erro ao iniciar build: ' + error.message, 'error');
+    }
+}
+
+async function createPipeline() {
+    const name = document.getElementById('pipelineName').value;
+    const repo = document.getElementById('gitRepo').value;
+    const branch = document.getElementById('gitBranch').value;
+    const script = document.getElementById('buildScript').value;
+    
+    if (!name || !repo) {
+        logConsole('❌ Preencha o nome e o repositório', 'error');
+        return;
+    }
+    
+    try {
+        logConsole(`➕ Criando pipeline "${name}"...`, 'info');
+        
+        // Simular criação de pipeline (substituir com API real)
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        logConsole(`✅ Pipeline "${name}" criado com sucesso!`, 'success');
+        
+        // Limpar formulário
+        document.getElementById('pipelineName').value = '';
+        document.getElementById('gitRepo').value = '';
+        document.getElementById('gitBranch').value = 'main';
+        document.getElementById('buildScript').value = '';
+        
+        refreshJenkins();
+        
+    } catch (error) {
+        logConsole('❌ Erro ao criar pipeline: ' + error.message, 'error');
+    }
+}
+
+async function loadRecentBuilds() {
+    const buildsEl = document.getElementById('recentBuilds');
+    
+    try {
+        // Simular dados de builds (substituir com API real)
+        const builds = [
+            { name: 'build-frontend #42', status: 'success', time: '2m ago', duration: '1m 30s' },
+            { name: 'build-backend #38', status: 'success', time: '5m ago', duration: '2m 15s' },
+            { name: 'deploy-staging #15', status: 'running', time: 'now', duration: '30s' },
+            { name: 'test-e2e #127', status: 'failed', time: '10m ago', duration: '5m 00s' },
+            { name: 'build-api #89', status: 'success', time: '15m ago', duration: '1m 45s' }
+        ];
+        
+        if (builds.length > 0) {
+            buildsEl.innerHTML = builds.map(build => `
+                <div class="build-item">
+                    <div class="build-info">
+                        <div class="build-name">${build.name}</div>
+                        <div class="build-status ${build.status}">
+                            ${build.status === 'success' ? '✅ Sucesso' : 
+                              build.status === 'running' ? '🔄 Executando' : '❌ Falhou'}
+                        </div>
+                    </div>
+                    <div class="build-time">
+                        <div>${build.time}</div>
+                        <div style="color: #64748b; font-size: 0.75rem;">${build.duration}</div>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            buildsEl.innerHTML = '<div class="loading">Nenhum build encontrado</div>';
+        }
+        
+    } catch (error) {
+        buildsEl.innerHTML = '<div class="error-message">Erro ao carregar builds</div>';
+    }
 }
 
 // Cleanup ao sair

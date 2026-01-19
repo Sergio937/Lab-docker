@@ -1601,6 +1601,135 @@ section h2::before {
     font-weight: 600;
 }
 
+/* CI/CD SECTION */
+.cicd-overview {
+    margin-bottom: 2rem;
+}
+
+.cicd-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.cicd-card {
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(20, 184, 166, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    backdrop-filter: blur(10px);
+}
+
+.cicd-card .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(20, 184, 166, 0.2);
+}
+
+.cicd-card .card-header h2 {
+    font-size: 1.25rem;
+    color: #14b8a6;
+    margin: 0;
+}
+
+.cicd-card .card-footer {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(20, 184, 166, 0.2);
+    display: flex;
+    gap: 1rem;
+}
+
+.cicd-data {
+    min-height: 200px;
+}
+
+.pipeline-config {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.form-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(20, 184, 166, 0.3);
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.9rem;
+    resize: vertical;
+    transition: all 0.2s;
+}
+
+.form-textarea:focus {
+    outline: none;
+    border-color: #14b8a6;
+    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+}
+
+.recent-builds {
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(20, 184, 166, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    backdrop-filter: blur(10px);
+}
+
+.builds-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.build-item {
+    background: rgba(20, 184, 166, 0.05);
+    border: 1px solid rgba(20, 184, 166, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.build-info {
+    flex: 1;
+}
+
+.build-name {
+    font-weight: 600;
+    color: #14b8a6;
+    margin-bottom: 0.25rem;
+}
+
+.build-status {
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+
+.build-status.success {
+    color: #10b981;
+}
+
+.build-status.failed {
+    color: #ef4444;
+}
+
+.build-status.running {
+    color: #f59e0b;
+}
+
+.build-time {
+    color: #64748b;
+    font-size: 0.8rem;
+}
+
 @media (max-width: 768px) {
     .form-grid { grid-template-columns: 1fr; }
     .button-group { flex-direction: column; }
@@ -1608,6 +1737,7 @@ section h2::before {
     .metrics-grid { grid-template-columns: 1fr; }
     .charts-grid { grid-template-columns: 1fr; }
     .security-grid { grid-template-columns: 1fr; }
+    .cicd-grid { grid-template-columns: 1fr; }
         max-width: 300px;
     }
     

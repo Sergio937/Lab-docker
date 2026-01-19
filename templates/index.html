@@ -32,6 +32,10 @@
                 <span class="nav-icon">🔒</span>
                 <span class="nav-text">Segurança</span>
             </a>
+            <a href="#cicd" class="nav-item" onclick="switchScreen('cicd')">
+                <span class="nav-icon">🔄</span>
+                <span class="nav-text">CI/CD</span>
+            </a>
         </nav>
 
         <div class="sidebar-footer">
@@ -272,6 +276,112 @@
                     <h2>📜 Histórico de Scans</h2>
                     <div id="scanHistory" class="history-list">
                         <div class="loading">Carregando histórico...</div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- CI/CD Screen -->
+            <div class="screen" id="screen-cicd">
+                <h1>🔄 CI/CD Pipeline</h1>
+                
+                <section class="cicd-overview">
+                    <h2>Visão Geral</h2>
+                    <div class="metrics-grid">
+                        <div class="metric-card metric-success">
+                            <div class="metric-icon">✅</div>
+                            <div class="metric-content">
+                                <div class="metric-value" id="successfulBuilds">0</div>
+                                <div class="metric-label">Builds Sucedidos</div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-card metric-danger">
+                            <div class="metric-icon">❌</div>
+                            <div class="metric-content">
+                                <div class="metric-value" id="failedBuilds">0</div>
+                                <div class="metric-label">Builds Falhados</div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-card metric-info">
+                            <div class="metric-icon">⏱️</div>
+                            <div class="metric-content">
+                                <div class="metric-value" id="avgBuildTime">-</div>
+                                <div class="metric-label">Tempo Médio de Build</div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-card metric-warning">
+                            <div class="metric-icon">🔄</div>
+                            <div class="metric-content">
+                                <div class="metric-value" id="activePipelines">0</div>
+                                <div class="metric-label">Pipelines Ativos</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="cicd-grid">
+                    <!-- Jenkins Dashboard -->
+                    <section class="cicd-card">
+                        <div class="card-header">
+                            <h2>🏗️ Jenkins - Automação CI/CD</h2>
+                            <button onclick="refreshJenkins()" class="btn-icon" title="Atualizar">🔄</button>
+                        </div>
+                        <div id="jenkinsStatus" class="status-indicator">
+                            <span class="status-dot status-loading"></span>
+                            <span>Verificando conexão...</span>
+                        </div>
+                        <div id="jenkinsData" class="cicd-data">
+                            <div class="loading">Carregando dados do Jenkins...</div>
+                        </div>
+                        <div class="card-footer">
+                            <a href="http://localhost:8080/jenkins" target="_blank" class="btn btn-secondary btn-sm">
+                                🔗 Abrir Jenkins
+                            </a>
+                            <button onclick="triggerBuild()" class="btn btn-warning btn-sm">
+                                ▶️ Executar Build
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Pipeline Configuration -->
+                    <section class="cicd-card">
+                        <div class="card-header">
+                            <h2>⚙️ Configuração de Pipeline</h2>
+                        </div>
+                        <div class="pipeline-config">
+                            <div class="form-group">
+                                <label for="pipelineName">Nome do Pipeline</label>
+                                <input type="text" id="pipelineName" class="form-input" placeholder="meu-projeto-pipeline">
+                            </div>
+                            <div class="form-group">
+                                <label for="gitRepo">Repositório Git</label>
+                                <input type="text" id="gitRepo" class="form-input" placeholder="https://github.com/usuario/repo.git">
+                            </div>
+                            <div class="form-group">
+                                <label for="gitBranch">Branch</label>
+                                <input type="text" id="gitBranch" class="form-input" placeholder="main" value="main">
+                            </div>
+                            <div class="form-group">
+                                <label for="buildScript">Script de Build</label>
+                                <textarea id="buildScript" class="form-textarea" rows="6" placeholder="npm install
+npm test
+docker build -t minha-app .
+docker push minha-app"></textarea>
+                            </div>
+                            <button onclick="createPipeline()" class="btn btn-warning">
+                                ➕ Criar Pipeline
+                            </button>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Recent Builds -->
+                <section class="recent-builds">
+                    <h2>📋 Builds Recentes</h2>
+                    <div id="recentBuilds" class="builds-list">
+                        <div class="loading">Carregando builds...</div>
                     </div>
                 </section>
             </div>
