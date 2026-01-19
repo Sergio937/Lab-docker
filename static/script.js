@@ -93,6 +93,11 @@ function switchScreen(screenName) {
         refreshJenkins();
         loadRecentBuilds();
     }
+    
+    // Se entrou na tela de Console, resetar
+    if (screenName === 'console') {
+        closeTerminal();
+    }
 }
 
 // Console Modal
@@ -1345,6 +1350,186 @@ async function loadRecentBuilds() {
     } catch (error) {
         buildsEl.innerHTML = '<div class="error-message">Erro ao carregar builds</div>';
     }
+}
+
+// CONSOLE FUNCTIONS
+let currentServer = null;
+let terminalHistory = [];
+
+function connectServer(serverName, type) {
+    currentServer = { name: serverName, type: type };
+    
+    const terminalSection = document.getElementById('terminalSection');
+    const terminalServerName = document.getElementById('terminalServerName');
+    const terminalPrompt = document.getElementById('terminalPrompt');
+    const terminalOutput = document.getElementById('terminalOutput');
+    
+    terminalSection.style.display = 'block';
+    terminalServerName.textContent = `Terminal - ${serverName}`;
+    terminalPrompt.textContent = `${serverName}$`;
+    
+    // Simular conexão
+    terminalOutput.innerHTML = `
+        <div class="terminal-line" style="color: #10b981;">✅ Conectado ao servidor ${serverName} via ${type.toUpperCase()}</div>
+        <div class="terminal-line" style="color: #94a3b8;">Tipo: ${type.toUpperCase()} | Status: Online</div>
+        <div class="terminal-line" style="color: #94a3b8;">Digite comandos abaixo ou use 'help' para ajuda</div>
+        <div class="terminal-line" style="margin-top: 0.5rem;"></div>
+    `;
+    
+    // Focar no input
+    document.getElementById('terminalInput').focus();
+    
+    logConsole(`🔗 Conectado ao ${serverName} via ${type.toUpperCase()}`, 'success');
+    
+    // Scroll suave até o terminal
+    setTimeout(() => {
+        terminalSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+}
+
+function openCustomConnection() {
+    const modal = document.getElementById('customConnectionModal');
+    modal.classList.add('active');
+}
+
+function closeCustomConnectionModal() {
+    const modal = document.getElementById('customConnectionModal');
+    modal.classList.remove('active');
+    
+    // Limpar formulário
+    document.getElementById('customConnectionForm').reset();
+    document.getElementById('serverPort').value = '22';
+}
+
+function connectCustomServer(event) {
+    event.preventDefault();
+    
+    const type = document.getElementById('connectionType').value;
+    const host = document.getElementById('serverHost').value;
+    const port = document.getElementById('serverPort').value;
+    const user = document.getElementById('serverUser').value;
+    
+    closeCustomConnectionModal();
+    
+    const serverName = `${user}@${host}:${port}`;
+    connectServer(serverName, type);
+}
+
+function handleTerminalInput(event) {
+    if (event.key === 'Enter') {
+        const input = document.getElementById('terminalInput');
+        const command = input.value.trim();
+        
+        if (command) {
+            executeCommand(command);
+            terminalHistory.push(command);
+            input.value = '';
+        }
+    }
+}
+
+function executeCommand(command) {
+    const terminalOutput = document.getElementById('terminalOutput');
+    const prompt = document.getElementById('terminalPrompt').textContent;
+    
+    // Adicionar comando ao output
+    const commandLine = document.createElement('div');
+    commandLine.className = 'terminal-line';
+    commandLine.innerHTML = `<span style="color: #14b8a6;">${prompt}</span> ${command}`;
+    terminalOutput.appendChild(commandLine);
+    
+    // Simular resposta do comando
+    const response = getCommandResponse(command);
+    const responseLine = document.createElement('div');
+    responseLine.className = 'terminal-line';
+    responseLine.innerHTML = response;
+    responseLine.style.marginBottom = '0.5rem';
+    terminalOutput.appendChild(responseLine);
+    
+    // Scroll para o final
+    const terminalBody = document.getElementById('terminalBody');
+    terminalBody.scrollTop = terminalBody.scrollHeight;
+}
+
+function getCommandResponse(command) {
+    const cmd = command.toLowerCase();
+    
+    if (cmd === 'help') {
+        return `<div style="color: #94a3b8;">
+            Comandos disponíveis:<br>
+            - ls: listar arquivos<br>
+            - pwd: diretório atual<br>
+            - whoami: usuário atual<br>
+            - docker ps: listar containers<br>
+            - docker images: listar imagens<br>
+            - clear: limpar terminal<br>
+            - help: mostrar ajuda
+        </div>`;
+    }
+    
+    if (cmd === 'ls' || cmd === 'ls -la') {
+        return `<div style="color: #e2e8f0;">
+            drwxr-xr-x  5 user user 4096 Jan 19 10:30 .<br>
+            drwxr-xr-x 25 user user 4096 Jan 18 15:20 ..<br>
+            -rw-r--r--  1 user user  220 Jan 10 09:15 .bash_logout<br>
+            -rw-r--r--  1 user user 3526 Jan 10 09:15 .bashrc<br>
+            drwxr-xr-x  3 user user 4096 Jan 15 14:30 docker<br>
+            -rw-r--r--  1 user user  807 Jan 10 09:15 .profile
+        </div>`;
+    }
+    
+    if (cmd === 'pwd') {
+        return `<div style="color: #e2e8f0;">/home/user</div>`;
+    }
+    
+    if (cmd === 'whoami') {
+        return `<div style="color: #e2e8f0;">user</div>`;
+    }
+    
+    if (cmd === 'docker ps') {
+        return `<div style="color: #e2e8f0;">
+            CONTAINER ID   IMAGE              COMMAND                  STATUS         PORTS<br>
+            a1b2c3d4e5f6   portainer/portainer "portainer"              Up 2 hours     0.0.0.0:9000->9000/tcp<br>
+            f6e5d4c3b2a1   jenkins/jenkins     "/sbin/tini -- /usr/…"   Up 3 hours     0.0.0.0:8081->8080/tcp<br>
+            b2a1f6e5d4c3   sonarqube:latest    "bin/run.sh bin/sona…"   Up 4 hours     0.0.0.0:9001->9000/tcp
+        </div>`;
+    }
+    
+    if (cmd === 'docker images') {
+        return `<div style="color: #e2e8f0;">
+            REPOSITORY            TAG       IMAGE ID       CREATED        SIZE<br>
+            portainer/portainer   latest    abc123def456   2 weeks ago    294MB<br>
+            jenkins/jenkins       latest    def456abc123   3 weeks ago    441MB<br>
+            sonarqube            latest    123abc456def   1 month ago    567MB
+        </div>`;
+    }
+    
+    if (cmd === 'clear') {
+        clearTerminal();
+        return '';
+    }
+    
+    return `<div style="color: #f59e0b;">bash: ${command}: command not found</div>`;
+}
+
+function clearTerminal() {
+    const terminalOutput = document.getElementById('terminalOutput');
+    if (currentServer) {
+        terminalOutput.innerHTML = `
+            <div class="terminal-line" style="color: #10b981;">✅ Terminal limpo</div>
+            <div class="terminal-line" style="margin-top: 0.5rem;"></div>
+        `;
+    } else {
+        terminalOutput.innerHTML = '';
+    }
+}
+
+function closeTerminal() {
+    const terminalSection = document.getElementById('terminalSection');
+    terminalSection.style.display = 'none';
+    currentServer = null;
+    terminalHistory = [];
+    clearTerminal();
 }
 
 // Cleanup ao sair

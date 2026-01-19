@@ -1730,6 +1730,146 @@ section h2::before {
     font-size: 0.8rem;
 }
 
+/* CONSOLE SECTION */
+.console-overview {
+    margin-bottom: 2rem;
+}
+
+.servers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.server-card {
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(20, 184, 166, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    backdrop-filter: blur(10px);
+}
+
+.server-card:hover {
+    border-color: #14b8a6;
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(20, 184, 166, 0.2);
+}
+
+.server-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.server-info h3 {
+    color: #14b8a6;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.server-info p {
+    color: #94a3b8;
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+}
+
+.server-type {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: rgba(20, 184, 166, 0.2);
+    border: 1px solid rgba(20, 184, 166, 0.3);
+    border-radius: 12px;
+    font-size: 0.75rem;
+    color: #14b8a6;
+    font-weight: 600;
+}
+
+.terminal-section {
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(20, 184, 166, 0.2);
+    border-radius: 12px;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+}
+
+.terminal-header {
+    background: rgba(30, 41, 59, 0.95);
+    border-bottom: 1px solid rgba(20, 184, 166, 0.2);
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.terminal-title {
+    color: #14b8a6;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.terminal-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.terminal-body {
+    background: #0a0e27;
+    padding: 1rem;
+    min-height: 400px;
+    max-height: 600px;
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.terminal-output {
+    color: #e2e8f0;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+
+.terminal-line {
+    margin-bottom: 0.25rem;
+}
+
+.terminal-input-line {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.terminal-prompt {
+    color: #14b8a6;
+    font-weight: 600;
+}
+
+.terminal-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #e2e8f0;
+    font-family: inherit;
+    font-size: 0.9rem;
+    outline: none;
+}
+
+.terminal-input::placeholder {
+    color: #64748b;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
 @media (max-width: 768px) {
     .form-grid { grid-template-columns: 1fr; }
     .button-group { flex-direction: column; }
@@ -1738,6 +1878,7 @@ section h2::before {
     .charts-grid { grid-template-columns: 1fr; }
     .security-grid { grid-template-columns: 1fr; }
     .cicd-grid { grid-template-columns: 1fr; }
+    .servers-grid { grid-template-columns: 1fr; }
         max-width: 300px;
     }
     
